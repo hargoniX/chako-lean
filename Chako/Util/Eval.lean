@@ -314,7 +314,7 @@ Evaluate `chako` on a problem, the core entrypoint for all the evaluation functi
 meta def tryChakoOn (evalProblem : Problem) : MetaM Result := do
   let g := evalProblem.g
   let (_, g) ← g.intros
-  let timeout := 2
+  let timeout := 10
 
   TransforM.run g { timeout := timeout } do
     withoutModifyingEnv do
