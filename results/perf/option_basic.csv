@@ -1,0 +1,9 @@
+theorem,mutant,result,encoding,nunchaku,recovery
+Option.instLawfulBEq,0,SAT,11,105,0
+Option.getD_some,0,SAT,2,55,0
+Option.getD_some,1,UNSAT,2,54,0
+Option.max_some_some,0,SAT,5,55,0
+Option.max_some_some,1,SAT,3,2882,0
+Option.min_some_some,0,SAT,3,106,0
+Option.min_some_some,1,SAT,4,53,0
+Option.instReflBEq,0,SAT,13,54,0

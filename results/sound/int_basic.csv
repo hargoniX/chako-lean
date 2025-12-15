@@ -1,0 +1,9 @@
+theorem,mutant,result,encoding,nunchaku,recovery
+Int.ofNat_eq_coe,0,UNSAT,3,52,0
+Int.cast_eq,0,UNSAT,5,53,0
+Int.ofNat_zero,0,UNSAT,2,53,0
+Int.instLawfulBEq,0,UNSAT,19,155,0
+Int.ofNat_one,0,UNSAT,3,104,0
+Int.zero_ne_one,0,UNSAT,2,55,0
+Int.default_eq_zero,0,UNSAT,5,114,0
+Int.ofNat_two,0,UNSAT,11,1571,0

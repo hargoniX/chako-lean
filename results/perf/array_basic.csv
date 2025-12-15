@@ -1,0 +1,16 @@
+theorem,mutant,result,encoding,nunchaku,recovery
+Array.mem_toArray,0,SAT,25,103,0
+Array.mem_def,0,SAT,23,54,0
+Array.ext',0,SAT,3,54,0
+Array.ext',1,UNSAT,2,54,0
+Array.ext',2,UNSAT,3,53,0
+Array.Mem.val,0,SAT,20,54,1
+Array.reverse.termination,0,SAT,12,104,0
+Array.reverse.termination,1,UNKNOWN,29,11071,0
+Array.reverse.termination,2,SAT,26,454,0
+Array.reverse.termination,3,UNKNOWN,15,11064,0
+Array.ext,0,UNKNOWN,15,11066,0
+Array.ext,1,SAT,10,54,0
+Array.ext,2,UNSAT,30,53,0
+Array.ext,3,UNSAT,15,453,0
+List.mem_toArray,0,SAT,43,403,0
