@@ -59,10 +59,12 @@ def insert [LT α] [DecidableLT α] (t : AATree α) (x : α) : AATree α :=
   match t with
   | nil => .node x 1 nil nil
   | node y lvl l r =>
-    let l' := if x < y then l.insert x else l
-    let r' := if x > y then r.insert x else r
-    split <| skew <| node y lvl l' r'
-
+    if x < y then
+      split <| skew <| node y lvl (l.insert x) r
+    else if x > y then
+      split <| skew <| node y lvl l (r.insert x)
+    else
+      node y lvl l r
 
 section
 
