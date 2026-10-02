@@ -3,6 +3,7 @@ public meta import Lean.Elab.Command
 import Lean.Elab.Command
 meta import Chako.Frontend
 meta import Chako.Transformation
+public import Chako.Attr
 
 /-!
 This module implements the mutation testing based evaluation framework for Chako. The key
@@ -311,12 +312,13 @@ meta def timedRun [Monad m] [MonadExceptOf Exception m] [MonadRuntimeException m
 /--
 Evaluate `chako` on a problem, the core entrypoint for all the evaluation functions.
 -/
-meta def tryChakoOn (evalProblem : Problem) : MetaM Result := do
+meta def tryChakoOn (evalProblem : Problem) (solvers : Array (ChakoConfig.Solvers)) :
+    MetaM Result := withoutModifyingState do
   let g := evalProblem.g
   let (_, g) ← g.intros
   let timeout := 10
 
-  TransforM.run g { timeout := timeout } do
+  TransforM.run g { timeout := timeout, solvers } do
     withoutModifyingEnv do
       let { timeMs := encodingMs, x := res } ← timedRun (Transformation.pipeline.run g)
       match res with
@@ -404,23 +406,29 @@ meta def evalChako (targetModule : Name) (file : System.FilePath)
       if let .thmInfo cinfo := cinfo then
         targets := targets ++ (← problemGenerator cinfo)
   let out ← IO.FS.Handle.mk file .write
-  out.putStrLn "theorem,mutant,result,encoding,nunchaku,recovery"
+  out.putStrLn "theorem,mutant,result,encoding,nunchaku,recovery,cvc5,smbc,kodkod"
+  let solvers := #[.cvc5, .smbc, .kodkod]
   targets.forM fun target => do
-    let res ← tryChakoOn target
+    let mainResult ← tryChakoOn target solvers
+    let uniqueResults ← solvers.mapM (tryChakoOn target #[·])
     let mut resStr := s!"{target.info.name},"
     resStr := resStr ++ s!"{target.mutation.getD 0},"
     resStr :=
       resStr ++
-        match res.kind with
+        match mainResult.kind with
         | .counterExample => "SAT,"
         | .proven => "UNSAT,"
         | .gaveUp => "UNKNOWN,"
         | .recoveryError .. => "ERR_RECOVERY,"
         | .nunchakuError .. => "ERR_NUNCHAKU,"
         | .encodingError .. => "ERR_ENCODING,"
-    resStr := resStr ++ s!"{res.duration.encodingMs},"
-    resStr := resStr ++ s!"{res.duration.nunchakuMs},"
-    resStr := resStr ++ s!"{res.duration.recoveryMs}"
+    resStr := resStr ++ s!"{mainResult.duration.encodingMs},"
+    resStr := resStr ++ s!"{mainResult.duration.nunchakuMs},"
+    resStr := resStr ++ s!"{mainResult.duration.recoveryMs}"
+    for uniqueResult in uniqueResults do
+      match uniqueResult.kind with
+      | .counterExample | .proven => resStr := resStr ++ ",true"
+      | _ => resStr := resStr ++ ",false"
     out.putStrLn resStr
 
 elab "#eval_chako_sound_module" id:ident file:str : command => do
@@ -434,7 +442,7 @@ elab "#eval_chako_sound_decl" id:ident : command => do
     let .thmInfo cinfo ← getConstInfo id.getId
       | throwError m!"Not a theorem {id}"
     let problem ← Problem.fromTheorem cinfo
-    let res ← tryChakoOn problem[0]!
+    let res ← tryChakoOn problem[0]! #[.cvc5, .smbc, .kodkod]
     logInfo m!"{res}"
 
 elab "#eval_chako_perf_decl" id:ident : command => do
@@ -444,7 +452,7 @@ elab "#eval_chako_perf_decl" id:ident : command => do
     let problems ← Problem.mutationsFromTheorem cinfo
     for problem in problems do
       logInfo m!"{problem.g}"
-      let res ← tryChakoOn problem
+      let res ← tryChakoOn problem #[.cvc5, .smbc, .kodkod]
       logInfo m!"{res}"
 
 end
