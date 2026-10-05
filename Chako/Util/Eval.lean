@@ -410,7 +410,22 @@ meta def evalChako (targetModule : Name) (file : System.FilePath)
   let solvers := #[.cvc5, .smbc, .kodkod]
   targets.forM fun target => do
     let mainResult ← tryChakoOn target solvers
-    let uniqueResults ← solvers.mapM (tryChakoOn target #[·])
+    let uniqueResults ←
+      if mainResult.kind matches .counterExample | .proven then
+        solvers.mapM (tryChakoOn target #[·])
+      else
+        -- measurement optimization, if the portfolio doesn't find it individuals won't either
+        let result := {
+          thm := target.info.name
+          mutation := target.mutation
+          kind := .gaveUp
+          duration := {
+            encodingMs := 1
+            nunchakuMs := 9999
+            recoveryMs := 0
+          }
+        }
+        pure <| solvers.map (fun _ => result)
     let mut resStr := s!"{target.info.name},"
     resStr := resStr ++ s!"{target.mutation.getD 0},"
     resStr :=
