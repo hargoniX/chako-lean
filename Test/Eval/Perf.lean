@@ -3,7 +3,9 @@ import Std
 
 set_option Elab.async false
 set_option maxHeartbeats 200000000
+set_option chako.eval.parallel 4
 #exit
+
 #eval_chako_perf_module Init.Data.Array.Basic "results/perf/array_basic.csv"
 #eval_chako_perf_module Init.Data.Array.Lemmas "results/perf/array_lemmas.csv"
 

@@ -3,6 +3,7 @@ import Std
 
 set_option Elab.async false
 set_option maxHeartbeats 200000000
+set_option chako.eval.parallel 4
 #exit
 #eval_chako_sound_module Init.Data.Array.Basic "results/sound/array_basic.csv"
 #eval_chako_sound_module Init.Data.Array.Lemmas "results/sound/array_lemmas.csv"
