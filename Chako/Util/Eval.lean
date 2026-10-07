@@ -391,6 +391,11 @@ meta def isBlackListed (declName : Name) : CoreM Bool := do
     <||> Meta.isMatcher declName
   | none => return true
 
+register_option chako.eval.parallel : Nat := {
+  defValue := 1
+  descr := "How many chako problems should be evaluated in parallel"
+}
+
 meta def evalChako (targetModule : Name) (file : System.FilePath)
     (problemGenerator : TheoremVal → MetaM (Array Problem)) : MetaM Unit := do
   let env ← getEnv
@@ -408,11 +413,47 @@ meta def evalChako (targetModule : Name) (file : System.FilePath)
   let out ← IO.FS.Handle.mk file .write
   out.putStrLn "theorem,mutant,result,encoding,nunchaku,recovery,cvc5,smbc,kodkod"
   let solvers := #[.cvc5, .smbc, .kodkod]
-  targets.forM fun target => do
+  let par := chako.eval.parallel.get (← getOptions)
+  for step in 0...=(targets.size / par) do
+    let startIdx := step * par
+    let endIdx := Nat.min ((step + 1) * par) targets.size
+    let roundTargets := targets[startIdx...endIdx].toArray
+    let tasks ← roundTargets.mapM fun roundTarget => do
+      IO.asTask (prio := .dedicated) <| (evalTarget roundTarget solvers).toIO (← readThe _) (← getThe _) (← readThe _) (← getThe _)
+    let taskResults ← tasks.mapM fun task => do
+      let (res, _, _) ← IO.ofExcept <| ← IO.wait task
+      return res
+    for (target, mainResult, uniqueResults) in taskResults do
+      let mut resStr := s!"{target.info.name},"
+      resStr := resStr ++ s!"{target.mutation.getD 0},"
+      resStr :=
+        resStr ++
+          match mainResult.kind with
+          | .counterExample => "SAT,"
+          | .proven => "UNSAT,"
+          | .gaveUp => "UNKNOWN,"
+          | .recoveryError .. => "ERR_RECOVERY,"
+          | .nunchakuError .. => "ERR_NUNCHAKU,"
+          | .encodingError .. => "ERR_ENCODING,"
+      resStr := resStr ++ s!"{mainResult.duration.encodingMs},"
+      resStr := resStr ++ s!"{mainResult.duration.nunchakuMs},"
+      resStr := resStr ++ s!"{mainResult.duration.recoveryMs}"
+      for uniqueResult in uniqueResults do
+        match uniqueResult.kind with
+        | .counterExample | .proven => resStr := resStr ++ ",true"
+        | _ => resStr := resStr ++ ",false"
+      out.putStrLn resStr
+where
+  evalTarget (target : Problem) (solvers : Array ChakoConfig.Solvers) : MetaM (Problem × Result × Array Result) := do
     let mainResult ← tryChakoOn target solvers
     let uniqueResults ←
       if mainResult.kind matches .counterExample | .proven then
-        solvers.mapM (tryChakoOn target #[·])
+        -- internal parallelism here is okay as nunchaku also runs them fully parallel
+        let tasks ← solvers.mapM fun solver => do
+          IO.asTask (prio := .dedicated) <| (tryChakoOn target #[solver]).toIO (← readThe _) (← getThe _) (← readThe _) (← getThe _)
+        tasks.mapM fun task => do
+          let (res, _, _) ← IO.ofExcept <| ← IO.wait task
+          return res
       else
         -- measurement optimization, if the portfolio doesn't find it individuals won't either
         let result := {
@@ -426,25 +467,7 @@ meta def evalChako (targetModule : Name) (file : System.FilePath)
           }
         }
         pure <| solvers.map (fun _ => result)
-    let mut resStr := s!"{target.info.name},"
-    resStr := resStr ++ s!"{target.mutation.getD 0},"
-    resStr :=
-      resStr ++
-        match mainResult.kind with
-        | .counterExample => "SAT,"
-        | .proven => "UNSAT,"
-        | .gaveUp => "UNKNOWN,"
-        | .recoveryError .. => "ERR_RECOVERY,"
-        | .nunchakuError .. => "ERR_NUNCHAKU,"
-        | .encodingError .. => "ERR_ENCODING,"
-    resStr := resStr ++ s!"{mainResult.duration.encodingMs},"
-    resStr := resStr ++ s!"{mainResult.duration.nunchakuMs},"
-    resStr := resStr ++ s!"{mainResult.duration.recoveryMs}"
-    for uniqueResult in uniqueResults do
-      match uniqueResult.kind with
-      | .counterExample | .proven => resStr := resStr ++ ",true"
-      | _ => resStr := resStr ++ ",false"
-    out.putStrLn resStr
+    return (target, mainResult, uniqueResults)
 
 elab "#eval_chako_sound_module" id:ident file:str : command => do
   Elab.Command.liftTermElabM (evalChako id.getId file.getString Problem.fromTheorem)
