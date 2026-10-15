@@ -1,4 +1,6 @@
 import pandas
+import sys
+import os
 
 PERF = "perf"
 SOUND = "sound"
@@ -62,8 +64,8 @@ def fmt_percent(num: int, total: int) -> str:
 def phantom(n: int) -> str:
     return rf"\phantom{{{'0' * n}}}" if n > 0 else ""
 
-def analyze_dir(prefix: str):
-    theories = load_data(prefix)
+def analyze_dir(dir_name: str, prefix: str):
+    theories = load_data(dir_name)
     rows = [(theory, count_stats(data, SOLVER_EXCLUDED_RESULT[prefix])) for (theory, data) in theories.items()]
     totals = [sum(col) for col in zip(*(counts for (_, counts) in rows))]
     total = totals[0]
@@ -104,8 +106,12 @@ def analyze_dir(prefix: str):
     print()
 
 def main():
-    analyze_dir(PERF)
-    analyze_dir(SOUND)
+    if len(sys.argv) < 2:
+        base_dir = "."
+    else:
+        base_dir = sys.argv[1]
+    analyze_dir(base_dir + os.path.sep + PERF, PERF)
+    analyze_dir(base_dir + os.path.sep + SOUND, SOUND)
 
 if __name__ == "__main__":
     main()
